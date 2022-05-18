@@ -128,6 +128,7 @@ public class Websocket {
         switch (command) {
             case "connectionCode" -> this.listener.onConnectedToServer(rest);
             case "connected" -> this.listener.onConnectedToPlayer(this, PlayerColor.fromString(rest));
+            case "error" -> this.listener.onError(rest);
             default -> System.err.printf("Unknown command: %s%n", command);
         }
     }
@@ -135,7 +136,7 @@ public class Websocket {
     public interface IListener {
         void onConnectedToServer(String kod);
         void onConnectedToPlayer(Websocket ws, PlayerColor color);
-        void onError();
+        void onError(String error);
         void onClosed();
     }
 }

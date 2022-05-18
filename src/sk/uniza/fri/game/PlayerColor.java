@@ -16,4 +16,12 @@ public enum PlayerColor {
             default -> null;
         };
     }
+
+    @Override
+    public String toString() {
+        return switch (this) {
+            case WHITE -> "white";
+            case BLACK -> "black";
+        };
+    }
 }

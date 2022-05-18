@@ -90,6 +90,10 @@ public class MainMenu {
         this.frame.pack();
     }
 
+    public void codeNotFound() {
+
+    }
+
     public interface IListener {
         void onConnect(String kod);
 
