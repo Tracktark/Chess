@@ -1,8 +1,12 @@
 package sk.uniza.fri.network;
 
+import sk.uniza.fri.game.PlayerColor;
+
+import java.io.*;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.WebSocket;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.concurrent.CompletionStage;
 
@@ -15,7 +19,7 @@ public class Websocket {
     public static final String SERVER_URL = "ws://localhost:8765";
 
     private final IListener listener;
-    private final HashMap<String, IWSCommand> commands;
+    private final HashMap<Class<?>, IMessageListener<?>> messageListeners;
     private WebSocket ws;
 
     public Websocket(IListener listener) {
@@ -23,9 +27,7 @@ public class Websocket {
             throw new IllegalArgumentException("Websocket Listener can't be null");
         }
         this.listener = listener;
-
-        this.commands = new HashMap<>();
-        this.registerCommands();
+        this.messageListeners = new HashMap<>();
 
         HttpClient httpClient = HttpClient.newHttpClient();
         WebSocket.Listener wsListener = new WebSocket.Listener() {
@@ -35,21 +37,59 @@ public class Websocket {
                 webSocket.sendText("getCode", true);
             }
 
+            // Textové správy sú zo servera
             @Override
             public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-                System.out.printf("Message: %s%n", data);
-                Websocket.this.dispatchEvent(data);
+                Websocket.this.processServerMessage(data);
                 return WebSocket.Listener.super.onText(webSocket, data, last);
             }
 
+            // Binárne správy sú od protihráča
             @Override
-            public void onError(WebSocket webSocket, Throwable error) {
-                WebSocket.Listener.super.onError(webSocket, error);
+            public CompletionStage<?> onBinary(WebSocket webSocket, ByteBuffer data, boolean last) {
+                Websocket.this.processClientMessage(data);
+                return WebSocket.Listener.super.onBinary(webSocket, data, last);
+            }
+
+            @Override
+            public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+                Websocket.this.listener.onClosed();
+                return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
             }
         };
 
         httpClient.newWebSocketBuilder().buildAsync(URI.create(SERVER_URL), wsListener)
                 .thenApply(webSocket -> this.ws = webSocket);
+    }
+
+    public <T> void registerMessageListener(Class<T> message, IMessageListener<T> listener) {
+        this.messageListeners.put(message, listener);
+    }
+
+    private void processClientMessage(ByteBuffer data) {
+        byte[] dataArray = new byte[data.limit()];
+        data.get(dataArray);
+        ByteArrayInputStream byteStream = new ByteArrayInputStream(dataArray);
+        try {
+            ObjectInputStream objectStream = new ObjectInputStream(byteStream);
+            Object object = objectStream.readObject();
+            Class<?> messageClass = object.getClass();
+            IMessageListener<?> handler = this.messageListeners.get(messageClass);
+            messageClass.cast(object);
+            if (handler != null) {
+                handler.handle(object);
+            } else {
+                System.err.format("Message %s doesn't have a handler%n", messageClass);
+            }
+        } catch (IOException e) {
+            System.err.println("Client Message reading failed");
+            e.printStackTrace();
+            System.exit(1);
+        } catch (ClassNotFoundException e) {
+            System.err.println("Client Message class not found");
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 
     public void connect(String kod) {
@@ -62,27 +102,40 @@ public class Websocket {
         }
     }
 
-    public interface IListener {
-        void onConnectedToServer(String kod);
-        void onConnectedToPlayer();
-        void onError();
+    public void send(Serializable message) {
+        ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+        try {
+            ObjectOutputStream objectStream = new ObjectOutputStream(byteStream);
+            objectStream.writeObject(message);
+            objectStream.flush();
+        } catch (IOException e) {
+            System.err.println("Client Message serialization failed");
+            e.printStackTrace();
+            System.exit(1);
+        }
+        byte[] serialized = byteStream.toByteArray();
+        this.ws.sendBinary(ByteBuffer.wrap(serialized), true);
     }
 
-    private void registerCommands() {
-        this.commands.put("connectionCode", this.listener::onConnectedToServer);
-        this.commands.put("connected", _rest -> this.listener.onConnectedToPlayer());
-    }
-
-    private void dispatchEvent(CharSequence data) {
+    private void processServerMessage(CharSequence data) {
         String[] splitString = data.toString().split("\n", 2);
         String command = splitString[0];
         String rest = null;
         if (splitString.length > 1) {
             rest = splitString[1];
         }
-        IWSCommand commandHandler = this.commands.get(command);
-        if (commandHandler != null) {
-            commandHandler.onCommand(rest);
+
+        switch (command) {
+            case "connectionCode" -> this.listener.onConnectedToServer(rest);
+            case "connected" -> this.listener.onConnectedToPlayer(this, PlayerColor.fromString(rest));
+            default -> System.err.printf("Unknown command: %s%n", command);
         }
+    }
+
+    public interface IListener {
+        void onConnectedToServer(String kod);
+        void onConnectedToPlayer(Websocket ws, PlayerColor color);
+        void onError();
+        void onClosed();
     }
 }
