@@ -1,14 +1,10 @@
 package sk.uniza.fri;
 
-import sk.uniza.fri.game.Chessboard;
 import sk.uniza.fri.game.Game;
 import sk.uniza.fri.game.PlayerColor;
-import sk.uniza.fri.game.pieces.Bishop;
-import sk.uniza.fri.gui.ChessboardComponent;
 import sk.uniza.fri.gui.MainMenu;
 import sk.uniza.fri.network.Websocket;
 
-import javax.swing.JFrame;
 
 /**
  * Created by IntelliJ IDEA.
@@ -17,7 +13,7 @@ import javax.swing.JFrame;
  * Time: 18:58
  */
 public class Main {
-    public static void main2(String[] args) {
+    public static void main(String[] args) {
         MainMenu menu = new MainMenu();
         Websocket ws = new Websocket(new Websocket.IListener() {
             @Override
@@ -60,17 +56,6 @@ public class Main {
         });
 
         menu.zobraz();
-    }
-
-    public static void main(String[] args) {
-        JFrame frame = new JFrame();
-        var boardCom = new ChessboardComponent(PlayerColor.BLACK);
-        var board = new Chessboard();
-        board.setPiece(0, 0, new Bishop(PlayerColor.BLACK));
-        boardCom.vykresliSachovnicu(board);
-        frame.setContentPane(boardCom);
-        frame.pack();
-        frame.setVisible(true);
     }
 
     private static void vytvorHru(Websocket ws, PlayerColor color) {

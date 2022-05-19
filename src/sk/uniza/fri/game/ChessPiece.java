@@ -31,7 +31,6 @@ public abstract class ChessPiece implements Cloneable {
         this.y = 0;
 
         String imagePath = String.format("images/%s_%s.png", this.color.toString(), pieceName);
-        System.out.println(imagePath);
         URL imageFile = ChessPiece.class.getClassLoader().getResource(imagePath);
         try {
             assert imageFile != null;
@@ -76,20 +75,19 @@ public abstract class ChessPiece implements Cloneable {
 
     /**
      * Nastaví pozíciu figúrky
-     * @param x X-ová súradnica novej pozície
-     * @param y Y-ová súradnica novej pozície
+     * @param pozicia Nová pozícia
      */
-    public void nastavPoziciu(int x, int y) {
-        this.x = x;
-        this.y = y;
+    public void nastavPoziciu(Pozicia pozicia) {
+        this.x = pozicia.x();
+        this.y = pozicia.y();
     }
 
     /**
      * Nastaví figúrku na jej začiatočnú pozíciu
-     * Pre väčšinu figúrok je táto metóda rovnaká, ako {@link ChessPiece#nastavPoziciu(int, int)}, ale pre niektoré môže byť iná
+     * Pre väčšinu figúrok je táto metóda rovnaká, ako {@link ChessPiece#nastavPoziciu(Pozicia)}, ale pre niektoré môže byť iná
      */
     public void zaciatocnaPozicia(int x, int y) {
-        this.nastavPoziciu(x, y);
+        this.nastavPoziciu(new Pozicia(x, y));
     }
 
     /**
